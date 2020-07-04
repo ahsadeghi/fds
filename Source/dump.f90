@@ -2401,8 +2401,11 @@ MESH_LOOP: DO NM=1,NMESHES
    DO N=1,M%N_VENT
       VT=>M%VENTS(N)
       IF (VT%RADIUS>0._EB) CYCLE
-      IF (VT%BOUNDARY_TYPE==OPEN_BOUNDARY) COLOR_INDEX = -VT%COLOR_INDICATOR
-      IF (VT%BOUNDARY_TYPE/=OPEN_BOUNDARY) COLOR_INDEX =  VT%COLOR_INDICATOR
+      IF (VT%BOUNDARY_TYPE==OPEN_BOUNDARY .OR. VT%BOUNDARY_TYPE==MIRROR_BOUNDARY)  THEN
+         COLOR_INDEX = -VT%COLOR_INDICATOR
+      ELSE
+         COLOR_INDEX = VT%COLOR_INDICATOR
+      ENDIF
       IF (VT%RGB(1)<0) THEN
          WRITE(LU_SMV,'(8I5)')        MAX(0,VT%I1),MIN(M%IBAR,VT%I2), &
                                       MAX(0,VT%J1),MIN(M%JBAR,VT%J2), &
@@ -3173,7 +3176,7 @@ WRITE_RADIATION: IF (RADIATION .AND. ALLOCATED(RSA)) THEN
          WRITE(LU_OUTPUT,'(A,I4)')  '   Using gray gas absorption.'
          WRITE(LU_OUTPUT,'(A,F6.3,A)')'   Mean beam length ',PATH_LENGTH,' m'
       ENDIF
-   ELSE
+   ELSEIF (KAPPA0 >= 0._EB) THEN
       WRITE(LU_OUTPUT,'(A,F7.3,A)')'   Using constant absorption coefficient of ',KAPPA0,' 1/m'
    ENDIF
 ENDIF WRITE_RADIATION
@@ -3461,8 +3464,8 @@ DO N=1,N_DEVC
                         DV%AVERAGE_VALUE2,DV%VALUE,DV%SMOOTHED_VALUE,DV%TIME_INTERVAL
    IF (DV%QUANTITY(1)=='CHAMBER OBSCURATION') THEN
       READ(LU_RESTART(NM)) N_T_E_MAX
-      DV%T_E => REALLOCATE(DV%T_E,-1,N_T_E_MAX)
-      DV%Y_E => REALLOCATE(DV%Y_E,-1,N_T_E_MAX)
+      DV%T_E => REALLOCATE(DV%T_E,0,N_T_E_MAX)
+      DV%Y_E => REALLOCATE(DV%Y_E,0,N_T_E_MAX)
       READ(LU_RESTART(NM)) DV%N_T_E,DV%T_E,DV%Y_E
    ENDIF
    IF (DV%QUANTITY(1)=='ASPIRATION') THEN
@@ -5971,8 +5974,9 @@ USE MEMORY_FUNCTIONS, ONLY : GET_LAGRANGIAN_PARTICLE_INDEX
 USE TRAN, ONLY: GET_IJK
 REAL(EB), INTENT(IN) :: T,DT
 INTEGER, INTENT(IN) :: NM
-REAL(EB) :: VALUE,VOL,XI,YJ,ZK
-INTEGER :: N,I,J,K,IW,ICC,SURF_INDEX,LP_INDEX,ICF
+REAL(EB) :: VALUE,VOL,XI,YJ,ZK,X_CENTER,Y_CENTER,Z_CENTER
+INTEGER :: N,I,J,K,IW,ICC,SURF_INDEX,LP_INDEX,ICF,IP
+TYPE(ONE_D_M_AND_E_XFER_TYPE), POINTER :: ONE_D
 
 CALL POINT_TO_MESH(NM)
 
@@ -6068,100 +6072,49 @@ DEVICE_LOOP: DO N=1,N_DEVC
 
                WALL_CELL_LOOP: DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
                   WC => WALL(IW)
-                  SELECT CASE(WC%BOUNDARY_TYPE)
-                     CASE(SOLID_BOUNDARY)
-                     CASE(OPEN_BOUNDARY)
-                     CASE DEFAULT
-                        CYCLE WALL_CELL_LOOP
-                  END SELECT
+                  IF (WC%BOUNDARY_TYPE/=SOLID_BOUNDARY .AND. WC%BOUNDARY_TYPE/=OPEN_BOUNDARY) CYCLE WALL_CELL_LOOP
                   SURF_INDEX = WC%SURF_INDEX
-                  IF (DV%IOR/=0 .AND. DV%IOR/=WC%ONE_D%IOR) CYCLE WALL_CELL_LOOP
+                  ONE_D => WC%ONE_D
+                  IF (DV%IOR/=0 .AND. DV%IOR/=ONE_D%IOR) CYCLE WALL_CELL_LOOP
                   IF (DV%SURF_ID/='null' .AND. SURFACE(SURF_INDEX)%ID/=DV%SURF_ID) CYCLE WALL_CELL_LOOP
-                  IF (WC%X<SDV%X1-MICRON .OR. WC%X>SDV%X2+MICRON .OR. &
-                      WC%Y<SDV%Y1-MICRON .OR. WC%Y>SDV%Y2+MICRON .OR. &
-                      WC%Z<SDV%Z1-MICRON .OR. WC%Z>SDV%Z2+MICRON) CYCLE WALL_CELL_LOOP
+                  X_CENTER = WC%X ; Y_CENTER = WC%Y ; Z_CENTER = WC%Z
+                  IF (X_CENTER<SDV%X1-MICRON .OR. X_CENTER>SDV%X2+MICRON .OR. &
+                      Y_CENTER<SDV%Y1-MICRON .OR. Y_CENTER>SDV%Y2+MICRON .OR. &
+                      Z_CENTER<SDV%Z1-MICRON .OR. Z_CENTER>SDV%Z2+MICRON) CYCLE WALL_CELL_LOOP
                   VALUE = SOLID_PHASE_OUTPUT(NM,ABS(DV%QUANTITY_INDEX(1)),DV%Y_INDEX,DV%Z_INDEX,DV%PART_CLASS_INDEX,&
                                              OPT_WALL_INDEX=IW,OPT_DEVC_INDEX=N)
-                  SELECT CASE(DV%SPATIAL_STATISTIC)
-                     CASE('MAX','MAXLOC X','MAXLOC Y','MAXLOC Z')
-                        IF (VALUE>SDV%VALUE_1) THEN
-                           SDV%VALUE_1 = VALUE
-                           SDV%VALUE_2 = REAL(SDV%MESH,EB)
-                           IF (DV%SPATIAL_STATISTIC=='MAXLOC X') SDV%VALUE_3 = WC%X
-                           IF (DV%SPATIAL_STATISTIC=='MAXLOC Y') SDV%VALUE_3 = WC%Y
-                           IF (DV%SPATIAL_STATISTIC=='MAXLOC Z') SDV%VALUE_3 = WC%Z
-                        ENDIF
-                     CASE('MIN','MINLOC X','MINLOC Y','MINLOC Z')
-                        IF (VALUE<SDV%VALUE_1) THEN
-                           SDV%VALUE_1 = VALUE
-                           SDV%VALUE_2 = REAL(SDV%MESH,EB)
-                           IF (DV%SPATIAL_STATISTIC=='MINLOC X') SDV%VALUE_3 = WC%X
-                           IF (DV%SPATIAL_STATISTIC=='MINLOC Y') SDV%VALUE_3 = WC%Y
-                           IF (DV%SPATIAL_STATISTIC=='MINLOC Z') SDV%VALUE_3 = WC%Z
-                        ENDIF
-                     CASE('MEAN')
-                        SDV%VALUE_1 = SDV%VALUE_1 + VALUE
-                        SDV%VALUE_2 = SDV%VALUE_2 + 1._EB
-                     CASE('SURFACE INTEGRAL')
-                        IF (VALUE <= DV%QUANTITY_RANGE(2) .AND. VALUE >=DV%QUANTITY_RANGE(1)) &
-                           SDV%VALUE_1 = SDV%VALUE_1 + VALUE*WC%ONE_D%AREA
-                     CASE('SURFACE AREA')
-                        IF (VALUE <= DV%QUANTITY_RANGE(2) .AND. VALUE >=DV%QUANTITY_RANGE(1)) &
-                           SDV%VALUE_1 = SDV%VALUE_1 + WC%ONE_D%AREA
-                     CASE('SUM')
-                        IF (VALUE <= DV%QUANTITY_RANGE(2) .AND. VALUE >=DV%QUANTITY_RANGE(1)) &
-                           SDV%VALUE_1 = SDV%VALUE_1 + VALUE
-                  END SELECT
+                  CALL SELECT_SPATIAL_STATISTIC
                ENDDO WALL_CELL_LOOP
 
                CFACE_LOOP : DO ICF=1,N_CFACE_CELLS
                   CFA => CFACE(ICF)
-                  SELECT CASE(CFA%BOUNDARY_TYPE)
-                     CASE(SOLID_BOUNDARY)
-                     CASE(OPEN_BOUNDARY)
-                     CASE DEFAULT
-                        CYCLE CFACE_LOOP
-                  END SELECT
+                  IF (CFA%BOUNDARY_TYPE/=SOLID_BOUNDARY .AND. CFA%BOUNDARY_TYPE/=OPEN_BOUNDARY) CYCLE CFACE_LOOP
                   SURF_INDEX = CFA%SURF_INDEX
-                  ! IF (DV%IOR/=0 .AND. DV%IOR/=CFA%ONE_D%IOR) CYCLE CFACE_LOOP
                   IF (DV%SURF_ID/='null' .AND. SURFACE(SURF_INDEX)%ID/=DV%SURF_ID) CYCLE CFACE_LOOP
-                  IF (CFA%X<SDV%X1-MICRON .OR. CFA%X>SDV%X2+MICRON .OR. &
-                      CFA%Y<SDV%Y1-MICRON .OR. CFA%Y>SDV%Y2+MICRON .OR. &
-                      CFA%Z<SDV%Z1-MICRON .OR. CFA%Z>SDV%Z2+MICRON) CYCLE CFACE_LOOP
+                  ONE_D => CFA%ONE_D
+                  X_CENTER = CFA%X ; Y_CENTER = CFA%Y ; Z_CENTER = CFA%Z
+                  IF (X_CENTER<SDV%X1-MICRON .OR. X_CENTER>SDV%X2+MICRON .OR. &
+                      Y_CENTER<SDV%Y1-MICRON .OR. Y_CENTER>SDV%Y2+MICRON .OR. &
+                      Z_CENTER<SDV%Z1-MICRON .OR. Z_CENTER>SDV%Z2+MICRON) CYCLE CFACE_LOOP
                   VALUE = SOLID_PHASE_OUTPUT(NM,ABS(DV%QUANTITY_INDEX(1)),DV%Y_INDEX,DV%Z_INDEX,DV%PART_CLASS_INDEX,&
                                              OPT_CFACE_INDEX=ICF,OPT_DEVC_INDEX=N)
-                  SELECT CASE(DV%SPATIAL_STATISTIC)
-                     CASE('MAX','MAXLOC X','MAXLOC Y','MAXLOC Z')
-                        IF (VALUE>SDV%VALUE_1) THEN
-                           SDV%VALUE_1 = VALUE
-                           SDV%VALUE_2 = REAL(SDV%MESH,EB)
-                           IF (DV%SPATIAL_STATISTIC=='MAXLOC X') SDV%VALUE_3 = CFA%X
-                           IF (DV%SPATIAL_STATISTIC=='MAXLOC Y') SDV%VALUE_3 = CFA%Y
-                           IF (DV%SPATIAL_STATISTIC=='MAXLOC Z') SDV%VALUE_3 = CFA%Z
-                        ENDIF
-                     CASE('MIN','MINLOC X','MINLOC Y','MINLOC Z')
-                        IF (VALUE<SDV%VALUE_1) THEN
-                           SDV%VALUE_1 = VALUE
-                           SDV%VALUE_2 = REAL(SDV%MESH,EB)
-                           IF (DV%SPATIAL_STATISTIC=='MINLOC X') SDV%VALUE_3 = CFA%X
-                           IF (DV%SPATIAL_STATISTIC=='MINLOC Y') SDV%VALUE_3 = CFA%Y
-                           IF (DV%SPATIAL_STATISTIC=='MINLOC Z') SDV%VALUE_3 = CFA%Z
-                        ENDIF
-                     CASE('MEAN')
-                        SDV%VALUE_1 = SDV%VALUE_1 + VALUE
-                        SDV%VALUE_2 = SDV%VALUE_2 + 1._EB
-                     CASE('SURFACE INTEGRAL')
-                        IF (VALUE <= DV%QUANTITY_RANGE(2) .AND. VALUE >=DV%QUANTITY_RANGE(1)) &
-                           SDV%VALUE_1 = SDV%VALUE_1 + VALUE*CFA%ONE_D%AREA
-                     CASE('SURFACE AREA')
-                        IF (VALUE <= DV%QUANTITY_RANGE(2) .AND. VALUE >=DV%QUANTITY_RANGE(1)) &
-                           SDV%VALUE_1 = SDV%VALUE_1 + CFA%ONE_D%AREA
-                     CASE('SUM')
-                        IF (VALUE <= DV%QUANTITY_RANGE(2) .AND. VALUE >=DV%QUANTITY_RANGE(1)) &
-                           SDV%VALUE_1 = SDV%VALUE_1 + VALUE
-                  END SELECT
-
+                  CALL SELECT_SPATIAL_STATISTIC
                ENDDO CFACE_LOOP
+
+               PARTICLE_LOOP: DO IP=1,NLP
+                  LP=>LAGRANGIAN_PARTICLE(IP)
+                  IF (LP%CLASS_INDEX/=DV%PART_CLASS_INDEX) CYCLE PARTICLE_LOOP
+                  LPC=>LAGRANGIAN_PARTICLE_CLASS(LP%CLASS_INDEX)
+                  SURF_INDEX = LPC%SURF_INDEX
+                  ONE_D => LP%ONE_D
+                  X_CENTER = LP%X ; Y_CENTER = LP%Y ; Z_CENTER = LP%Z
+                  IF (X_CENTER<SDV%X1-MICRON .OR. X_CENTER>SDV%X2+MICRON .OR. &
+                      Y_CENTER<SDV%Y1-MICRON .OR. Y_CENTER>SDV%Y2+MICRON .OR. &
+                      Z_CENTER<SDV%Z1-MICRON .OR. Z_CENTER>SDV%Z2+MICRON) CYCLE PARTICLE_LOOP
+                  VALUE = SOLID_PHASE_OUTPUT(NM,ABS(DV%QUANTITY_INDEX(1)),DV%Y_INDEX,DV%Z_INDEX,DV%PART_CLASS_INDEX,&
+                                             OPT_LP_INDEX=IP,OPT_DEVC_INDEX=N)
+                  CALL SELECT_SPATIAL_STATISTIC
+               ENDDO PARTICLE_LOOP
 
          END SELECT SOLID_STATS_SELECT
 
@@ -6283,6 +6236,46 @@ DEVICE_LOOP: DO N=1,N_DEVC
    END SELECT OUTPUT_INDEX_SELECT
 
 ENDDO DEVICE_LOOP
+
+CONTAINS
+
+
+!> \brief Select the appropriate SPATIAL_STATISTIC for a WALL, CFACE or PARTICLE
+
+SUBROUTINE SELECT_SPATIAL_STATISTIC
+
+SELECT CASE(DV%SPATIAL_STATISTIC)
+   CASE('MAX','MAXLOC X','MAXLOC Y','MAXLOC Z')
+      IF (VALUE>SDV%VALUE_1) THEN
+         SDV%VALUE_1 = VALUE
+         SDV%VALUE_2 = REAL(SDV%MESH,EB)
+         IF (DV%SPATIAL_STATISTIC=='MAXLOC X') SDV%VALUE_3 = X_CENTER
+         IF (DV%SPATIAL_STATISTIC=='MAXLOC Y') SDV%VALUE_3 = Y_CENTER
+         IF (DV%SPATIAL_STATISTIC=='MAXLOC Z') SDV%VALUE_3 = Z_CENTER
+      ENDIF
+   CASE('MIN','MINLOC X','MINLOC Y','MINLOC Z')
+      IF (VALUE<SDV%VALUE_1) THEN
+         SDV%VALUE_1 = VALUE
+         SDV%VALUE_2 = REAL(SDV%MESH,EB)
+         IF (DV%SPATIAL_STATISTIC=='MINLOC X') SDV%VALUE_3 = X_CENTER
+         IF (DV%SPATIAL_STATISTIC=='MINLOC Y') SDV%VALUE_3 = Y_CENTER
+         IF (DV%SPATIAL_STATISTIC=='MINLOC Z') SDV%VALUE_3 = Z_CENTER
+      ENDIF
+   CASE('MEAN')
+      SDV%VALUE_1 = SDV%VALUE_1 + VALUE
+      SDV%VALUE_2 = SDV%VALUE_2 + 1._EB
+   CASE('SURFACE INTEGRAL')
+      IF (VALUE <= DV%QUANTITY_RANGE(2) .AND. VALUE >=DV%QUANTITY_RANGE(1)) &
+         SDV%VALUE_1 = SDV%VALUE_1 + VALUE*ONE_D%AREA
+   CASE('SURFACE AREA')
+      IF (VALUE <= DV%QUANTITY_RANGE(2) .AND. VALUE >=DV%QUANTITY_RANGE(1)) &
+         SDV%VALUE_1 = SDV%VALUE_1 + ONE_D%AREA
+   CASE('SUM')
+      IF (VALUE <= DV%QUANTITY_RANGE(2) .AND. VALUE >=DV%QUANTITY_RANGE(1)) &
+         SDV%VALUE_1 = SDV%VALUE_1 + VALUE
+END SELECT
+
+END SUBROUTINE SELECT_SPATIAL_STATISTIC
 
 END SUBROUTINE UPDATE_DEVICES_1
 
@@ -7283,8 +7276,8 @@ IND_SELECT: SELECT CASE(IND)
       VEL2 = 0.25_EB*( (U(I,J,K)+U(I-1,J,K))**2 + (V(I,J,K)+V(I,J-1,K))**2 + (W(I,J,K)+W(I,J,K-1))**2 )
       VEL  = MAX(SQRT(VEL2),1.0E-10_EB)
       IF (DV%N_T_E>=UBOUND(DV%T_E,1)) THEN
-         DV%T_E => REALLOCATE(DV%T_E,-1,DV%N_T_E+1000)
-         DV%Y_E => REALLOCATE(DV%Y_E,-1,DV%N_T_E+1000)
+         DV%T_E => REALLOCATE(DV%T_E,0,DV%N_T_E+1000)
+         DV%Y_E => REALLOCATE(DV%Y_E,0,DV%N_T_E+1000)
       ENDIF
       DV%N_T_E = DV%N_T_E + 1
       DV%Y_E(DV%N_T_E) = Y_SPECIES
@@ -7914,7 +7907,7 @@ INTEGER, INTENT(IN) :: INDX,Y_INDEX,Z_INDEX,PART_INDEX,NM
 REAL(EB) :: CONCORR,VOLSUM,MFT,ZZ_GET(1:N_TRACKED_SPECIES),Y_SPECIES,DEPTH,UN,H_S,RHO_D_DYDN,U_CELL,V_CELL,W_CELL,&
             AAA,BBB,CCC,ALP,BET,GAM,MMM,LTMP,ATMP,CTMP,H_W_EFF,X0,X1,XC0,XC1,TMP_BAR,VOL,DVOL,DN,PRESS,&
             NVEC(3),PVEC(3),TAU_IJ(3,3),VEL_CELL(3),VEL_WALL(3),MU_WALL,RHO_WALL,FVEC(3),SVEC(3),TVEC1(3),TVEC2(3),&
-            P1,P2,Z1,Z2
+            P1,P2,Z1,Z2,RADIUS
 INTEGER :: II1,II2,IIG,JJG,KKG,NN,NR,IWX,SURF_INDEX,I,J,K,IW,II,JJ,KK,NWP,IOR,M_INDEX,ICC,IND1,IND2,IC2,LPX,ITMP
 CHARACTER(LABEL_LENGTH) :: MATL_ID='null'
 TYPE(WALL_TYPE), POINTER :: WC=>NULL()
@@ -8118,6 +8111,13 @@ SOLID_PHASE_SELECT: SELECT CASE(INDX)
          ELSE
             SOLID_PHASE_OUTPUT = SURFACE_DENSITY(NM,0,WALL_INDEX=IWX)
          ENDIF
+      ENDIF
+      IF (INDX==25 .AND. SF%THERMAL_BC_INDEX==THERMALLY_THICK) THEN
+         RADIUS = SF%INNER_RADIUS + ONE_D%X(SUM(ONE_D%N_LAYER_CELLS)) - ONE_D%X(0)
+         SELECT CASE(SF%GEOMETRY)
+            CASE(SURF_CYLINDRICAL) ; SOLID_PHASE_OUTPUT = SOLID_PHASE_OUTPUT* SF%THICKNESS/RADIUS
+            CASE(SURF_SPHERICAL)   ; SOLID_PHASE_OUTPUT = SOLID_PHASE_OUTPUT*(SF%THICKNESS/RADIUS)**2
+         END SELECT
       ENDIF
       IF (INDX==26) SOLID_PHASE_OUTPUT = SOLID_PHASE_OUTPUT/SF%SURFACE_DENSITY
 
@@ -9784,8 +9784,8 @@ IF (CC_IBM) THEN
       NC = 0
       I1=0; I2=-1; J1=0; J2=-1; K1=0; K2=-1; ! Just dummy numbers, not needed for INBOUND_FACES
       ! write geometry for slice file
-      IF (ABS(REAL(T_BEGIN,FB)-T_BEGIN)<TWO_EPSILON_FB) THEN
-         ! geometry and data file at first time step
+      IF (REAL(T-T_BEGIN,FB)<TWO_EPSILON_FB) THEN
+         ! geometry and data file initial write
          OPEN(LU_BNDF_GEOM(NF,NM),FILE=FN_BNDF_GEOM(NF,NM),FORM='UNFORMATTED',STATUS='REPLACE')
          CALL DUMP_SLICE_GEOM(LU_BNDF_GEOM(NF,NM),"INBOUND_FACES",1,STIME,I1,I2,J1,J2,K1,K2)
          CLOSE(LU_BNDF_GEOM(NF,NM))

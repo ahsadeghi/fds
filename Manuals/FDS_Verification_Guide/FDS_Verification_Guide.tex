@@ -155,6 +155,8 @@ The following individuals contributed to the verification process of FDS.
 \item Chao Zhang of Tongji University provided the finite-element analysis for the HT3D I-beam test case.
 \item Salah Benkorichi of Ulster University, Belfast, developed the HT3D sphere test case.
 \item Kiyoung Moon and Jung-il Choi of Yonsei University, Seoul, South Korea, provided the Heat Channel Flow case.
+\item Jesus Alberto Mejias Tuni of Politecnico di Torino provided the 1-D tunnel cases with heat release.
+\item Morteza Gholami Haghighi Fard of Aalto University, Finland, contributed the PYRO3D ``Parallel Solid Phase Reactions'' case.
 \end{itemize}
 
 
@@ -1511,6 +1513,8 @@ This test case is a replica of {\ct water\_evaporation\_1} in Sec.~\ref{water_ev
 
 \section{Tunnel Flow}
 
+\textbf{Jesus Alberto Mejias Tuni, Politecnico di Torino}
+
 \subsection{1-D Flow in a Tunnel (\texorpdfstring{\textct{tunnel\_const\_gamma}}{tunnel\_const\_gamma})}
 \label{tunnel_const_gamma}
 
@@ -2741,6 +2745,20 @@ Tests similar to those in Section~\ref{droplet_absorption} are performed for sol
 \label{particle_absorption_figures}
 \end{figure}
 
+
+\section{Consistency of Particle Absorbed Energy and the Radiative Loss Term}
+\label{particle_isotropic_radiation}
+\label{particle_anisotropic_radiation}
+
+Small spherical, cylindrical and planar particles with black (emissivity = 1) surfaces are placed in radiation field. Radiation is coming from black surfaces, and the gas is pure Nitrogen, i.e. non-participating. The amount of energy removed from the intensity field is measured by a device calculating spatial and temporal integrals of radiation loss term (Q\_w).  The reference solution (E\_w) is the wall enthalpy increase, as observed by the one-dimensional heat conduction solver. 
+In {\ct particle\_isotropic\_radiation}, the radiation field isotropic, i.e. all surfaces are black and constant temperature. In {\ct particle\_anisotropic\_radiation}, an anistropic intensity field is geated by specifying one hot wall, one cold wall, and four other fields being mirrors. 
+
+\begin{figure}[ht]
+\includegraphics[height=2.2in]{SCRIPT_FIGURES/particle_isotropic_radiation}
+\includegraphics[height=2.2in]{SCRIPT_FIGURES/particle_anisotropic_radiation}
+\caption[The {\ct particle\_isotropic\_radiation} and {\ct particle\_anisotropic\_radiation} test cases]{Absorbed energy of spherical, cylindrical and cartesian particles in isotropic (left) and anisotropic (right) radiation field.}
+\label{particle_an_isotropic_radiation_figs}
+\end{figure}
 
 
 \section{Radiation Attenuation by Scattering Particles (\texorpdfstring{\textct{part\_attenuation}}{part\_attenuation}) }
@@ -4788,6 +4806,21 @@ This case compares mass loss rates and material thickness for pyrolysis of black
     \end{tabular*}
 	\caption[PYRO3D mass loss rate and material thickness (the {\ct pyro3d\_vs\_pyro1d} case)]{Comparison of thickness in 1D with burn away in 3D.  Verification targets are mass loss rate per unit area and material thickness curves.}
 	\label{fig:pyro3d_vs_pyro1d}
+\end{figure}
+
+\subsection{Parallel Solid Phase Reactions (\texorpdfstring{\textct{pyro3d\_vs\_pyro1d\_wood\_moist}}{pyro3d\_vs\_pyro1d\_wood\_moist})}
+\label{pyro3d_vs_pyro1d_wood_moist}
+
+\textbf{Morteza Gholami Haghighi Fard, Aalto University}\\
+
+\noindent This case compares the mass conservation results between the 3D pyrolysis solver and 1D solver for a solid which undergoes a more complicated pyrolysis reaction than a solid with single virgin material. A wooden sample composed of 10 \% moisture content and 90 \% birch material (by mass) is heated up with an external flux of 50 \si{kW/m^2} from the top in both solvers. The moisture content evaporates into water vapor completely. Diversely, half of the birch material pyrolyzes into gaseous fuel while the other half converts to char residue. For the sake of comparability of 1D and 3D solvers, geometry and grid resolutions are set the same as the {\ct pyro3d\_vs\_pyro1d} verification case. Fig.~\ref{fig:pyro3d_vs_pyro1d_wood_moist} compares the gas production and solid phase material exchange for two solvers. As one can see, both algorithms generate similar results.
+
+\begin{figure}[!htb]
+	\centering
+	\includegraphics[height=2.2in]{SCRIPT_FIGURES/pyro3d_vs_pyro1d_wood_moist_gas} \\
+	\includegraphics[height=2.2in]{SCRIPT_FIGURES/pyro3d_vs_pyro1d_wood_moist_solid}
+	\caption[PYRO3D parallel solid phase reactions (the {\ct pyro3d\_vs\_pyro1d\_wood\_moist} case)]{Comparison of mass conservation results of 3D and 1D pyrolysis solvers for a wooden sample with parallel pyrolysis reactions. The top plot compares the gas production and the lower plot compares the solid phase material exchange. Verification targets are mass curves.}
+	\label{fig:pyro3d_vs_pyro1d_wood_moist}
 \end{figure}
 
 \subsection{Mass Transport (\texorpdfstring{\textct{pyro3d\_transport}}{pyro3d\_transport})}

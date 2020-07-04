@@ -452,7 +452,9 @@ $QFDS -d Pyrolysis water_ice_water.fds
 $QFDS -d Pyrolysis pcm_slab.fds
 $QFDS -d Pyrolysis pyro3d_wood_char.fds
 $QFDS -d Pyrolysis pyro3d_vs_pyro1d.fds
+$QFDS -d Pyrolysis pyro3d_vs_pyro1d_wood_moist.fds
 $QFDS -d Pyrolysis pyro3d_transport.fds
+
 
 $QFDS -d Radiation adiabatic_surface_temperature.fds
 $QFDS -d Radiation droplet_absorption_cart.fds
@@ -589,6 +591,8 @@ $QFDS -d Sprinklers_and_Sprays droplet_distributions_2.fds
 $QFDS -d Sprinklers_and_Sprays flow_rate.fds
 $QFDS -d Sprinklers_and_Sprays flow_rate_2.fds
 $QFDS -p 2 -d Sprinklers_and_Sprays geom_sprk_mass.fds
+$QFDS -d Sprinklers_and_Sprays particle_anisotropic_radiation.fds
+$QFDS -d Sprinklers_and_Sprays particle_isotropic_radiation.fds
 $QFDS -d Sprinklers_and_Sprays particle_colors.fds
 $QFDS -d Sprinklers_and_Sprays particle_drag_U10_N16.fds
 $QFDS -d Sprinklers_and_Sprays particle_drag_U50_N16.fds
