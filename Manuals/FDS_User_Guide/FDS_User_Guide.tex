@@ -200,7 +200,7 @@ Smokeview is a separate visualization program that is used to display the result
 The first version of FDS was publicly released in February 2000. To date, about half of the applications of the model have been for design of smoke handling systems and sprinkler/detector activation studies. The other half consist of residential and industrial fire reconstructions. Throughout its development, FDS has been aimed at solving practical fire problems in fire protection engineering, while at the same time providing a tool to study fundamental fire dynamics and combustion.
 
 \begin{description}
-\item[Hydrodynamic Model] FDS solves numerically a form of the Navier-Stokes equations appropriate for low-speed, thermally-driven flow with an emphasis on smoke and heat transport from fires. The core algorithm is an explicit predictor-corrector scheme, second order accurate in space and time. Turbulence is treated by means of Large Eddy Simulation (LES). It is possible to perform a Direct Numerical Simulation (DNS) if the underlying numerical mesh is fine enough. LES is the default mode of operation.
+\item[Hydrodynamic Model] FDS solves numerically a form of the Navier-Stokes equations appropriate for low-speed, thermally-driven flow with an emphasis on smoke and heat transport from fires. The core algorithm is an explicit predictor-corrector scheme, second order accurate in space and time. Turbulence is treated by means of Large Eddy Simulation (LES). It is possible to perform a Direct Numerical Simulation (DNS) if the underlying numerical mesh is fine enough. See Sec.~\ref{Sim_Mode} for further details.
 \item[Combustion Model] For most applications, FDS uses a single step, mixing-controlled chemical reaction which uses three lumped species (a species representing a group of species). These lumped species are air, fuel, and products. By default the last two lumped species are explicitly computed. Options are available to include multiple reactions and reactions that are not necessarily mixing-controlled.
 \item[Radiation Transport] Radiative heat transfer is included in the model via the solution of the radiation transport equation for a gray gas, and in some limited cases using a wide band model. The equation is solved using a technique similar to finite volume methods for convective transport, thus the name given to it is the Finite Volume Method (FVM).  Using approximately 100 discrete angles, the finite volume solver requires about 20~\% of the total CPU time of a calculation, a modest cost given the complexity of radiation heat transfer. The absorption coefficients of the gas-soot mixtures are computed using the RadCal narrow-band model~\cite{RadCal}.  Liquid droplets can absorb and scatter thermal radiation. This is important in cases involving mist sprinklers, but also plays a role in all sprinkler cases.  The absorption and scattering coefficients are based on Mie theory.
 \item[Geometry] FDS approximates the governing equations on a rectilinear mesh. Rectangular obstructions are forced to conform with the underlying mesh.
@@ -1024,7 +1024,9 @@ The pressure solver in FDS employs Fast Fourier Transforms (FFTs) in the $y$ and
 \subsection{Two-Dimensional and Axially-Symmetric Calculations}
 \label{info:2D}
 
-The governing equations solved in FDS are written in terms of a three dimensional Cartesian coordinate system. However, a two dimensional Cartesian or two dimensional cylindrical (axially-symmetric) calculation can be performed by setting the {\ct J} in the {\ct IJK} triplet to 1 on the {\ct MESH} line. For axial symmetry, add {\ct CYLINDRICAL=.TRUE.} to the {\ct MESH} line, and the coordinate $x$ is then interpreted as the radial coordinate $r$. No boundary conditions should be set at the planes $y=\hbox{\ct YMIN=XB(3)}$ or $y=\hbox{\ct YMAX=XB(4)}$, nor at $r=\hbox{\ct XMIN=XB(1)}$ in an axially-symmetric calculation in which $r=\hbox{\ct XB(1)=0}$. For better visualizations, the difference between {\ct XB(4)} and {\ct XB(3)} should be small so that the Smokeview rendering appears to be in 2-D. An example of an axially-symmetric helium plume is given in Section~\ref{baroclinic_torque}.
+The governing equations solved in FDS are written in terms of a three dimensional Cartesian coordinate system. However, a two dimensional Cartesian or two dimensional cylindrical (axially-symmetric) calculation can be performed by setting the {\ct J} in the {\ct IJK} triplet to 1 on the {\ct MESH} line. For axial symmetry, add {\ct CYLINDRICAL=.TRUE.} to the {\ct MESH} line, and the coordinate $x$ is then interpreted as the radial coordinate $r$. If you are using more than one mesh, all should be specified as 2-D or {\ct CYLINDRICAL}---you cannot mix 2-D, 3-D and cylindrical geometries. No boundary conditions should be set at the planes $y=\hbox{\ct YMIN=XB(3)}$ or $y=\hbox{\ct YMAX=XB(4)}$, nor at $r=\hbox{\ct XMIN=XB(1)}$ in an axially-symmetric calculation if $r=\hbox{\ct XB(1)=0}$ (Note that {\ct XB(1)} does not have to be 0). For better visualizations, the difference between {\ct XB(4)} and {\ct XB(3)} should be small so that the Smokeview rendering appears to be in 2-D. An example of an axially-symmetric helium plume is given in Section~\ref{baroclinic_torque}.
+
+When processing results for a {\ct CYLINDRICAL} simulation, note that integrated quantities like {\ct HRR} (Heat Release Rate) apply only to the specified 2-D or cylindrical coordinates. Thus, the cylindrical coordinates define a cylindrical sector, like a slice of cake, even though Smokeview will not render it this way. The fully integrated quantity, like {\ct HRR}, can be found by multiplying the reported value by $2 \pi \, \delta\theta$, where $\delta\theta$ is the difference between {\ct YMAX} and {\ct YMIN} in radians. It does not matter what values you choose for {\ct YMAX} and {\ct YMIN} as long as the rendering in Smokeview is to your liking.
 
 
 \subsection{Multiple Meshes}
@@ -1272,7 +1274,6 @@ Key Parameter                          & Section                        & {\ct '
 {\ct CHECK\_VN}                        & \ref{info:VN}                  & T           & T            & T             & F              \\ \hline
 {\ct CONSTANT\_SPECIFIC\_HEAT\_RATIO}  & \ref{info:Enthalpy}            & F           & F            & F             & T              \\ \hline
 {\ct MAX\_PRESSURE\_ITERATIONS}        & \ref{pressure_solver}          & 10          & 10           & 10            & 3              \\ \hline
-{\ct PROJECTION}                       & \ref{pressure_solver}          & T           & T            & F             & F              \\ \hline
 {\ct NEAR\_WALL\_TURBULENCE\_MODEL}    & \ref{info:LES}                 & None        & WALE         & Van Driest    & Van Driest     \\ \hline
 \end{tabular}
 \end{table}
@@ -1595,17 +1596,12 @@ If multiple meshes are involved, it is assumed that the {\ct CSVF} lines are pro
 \begin{lstlisting}
 &CSVF UVWFILE='CHID_t001_m001.csv' /
 &CSVF UVWFILE='CHID_t001_m002.csv' /
-&MISC PROJECTION=.TRUE. /
 \end{lstlisting}
 The above approach is deprecated because it may be cumbersome if a large number of meshes is needed.  To overcome this issue, you may set {\ct PER\_MESH=T}, which will append the mesh number and {\ct .csv} to the {\ct UVWFILE} string.  For example, if you had 16 meshes you can use
 \begin{lstlisting}
 &CSVF UVWFILE='CHID_t001_m', PER_MESH=T /
-&MISC PROJECTION=.TRUE. /
 \end{lstlisting}
 and FDS will read {\ct CHID\_t001\_m001.csv} through {\ct CHID\_t001\_m016.csv} in the order of the {\ct MESH} lines (note that a {\ct MULT} line for the meshes may also be used).  Note that the the {\ct UVWFILE} string should contain the ``{\ct m}'' (if it exists) as this is not automatically appended.
-
-It is recommended that you also specify {\ct PROJECTION=.TRUE.} on {\ct MISC} if the specified velocity field does not satisfy the divergence constraint to machine precision on a staggered grid (this may not even be true if an analytical solution to the Navier-Stokes equations is sampled at the staggered velocity component locations).
-
 
 
 
@@ -2971,7 +2967,6 @@ Note that there is no need to specify a {\ct MATL\_ID} or {\ct THICKNESS}. Becau
 there is no need to say anything about its material composition or thickness.
 
 
-
 \subsection{Special Topic: Convective Heat Transfer Options}
 \label{info:convection}
 
@@ -3012,7 +3007,19 @@ By analogy, we define the non-dimensional temperature $T^+ \equiv (T_{\rm g}-T_{
 \begin{equation}
 h = \frac{\dot{q}''_{\rm w}}{T_{\rm g}-T_{\rm w}} = \frac{\rho_{\rm w} \, c_{\rm p} \, u_\tau}{T^+}
 \end{equation}
-Refer to the FDS Tech Guide \cite{FDS_Tech_Guide} for further details of the formulation. To specify this heat transfer model for a particular surface, set {\ct HEAT\_TRANSFER\_MODEL} equal to {\ct 'LOGLAW'} on the {\ct SURF} line.
+Refer to the FDS Tech Guide \cite{FDS_Tech_Guide} for further details of the formulation. To specify this heat transfer model for a particular surface, set {\ct HEAT\_TRANSFER\_MODEL} equal to {\ct 'LOGLAW'} on the {\ct SURF} line. Note that the loglaw model is not well-suited for buoyant flows---it requires a well-resolved ``wind'' near the surface and is therefore mainly applicable to forced convection type flows with high grid resolution.
+
+\subsubsection{Atmospheric Boundary Layer Wall Model}
+\label{sec:abl_model}
+
+The incorporation of buoyancy into the wall function is the domain of Monin-Obuhkov (MO) similarity theory, as discussed in Sec.~\ref{info:WIND}. Further mathematical details of the ABL wall model are discussed in the FDS Tech Guide \cite{FDS_Math_Guide}.  To specify this model for a particular surface, set {\ct HEAT\_TRANSFER\_MODEL} equal to {\ct ABL} on the {\ct SURF} line together with the aerodynamic roughness length, {\ct Z\_0}.  For example,
+\begin{lstlisting}
+&SURF ID='ground', HEAT_TRANSFER_MODEL='ABL', Z_0=0.05 /
+\end{lstlisting}
+
+As discussed in Sec.~\ref{info:WIND}, there is a simple conversion between the aerodynamic roughness and the sandgrain roughness, which can be input using {\ct ROUGHNESS} on {\ct SURF}.  Either {\ct Z\_0} or {\ct ROUGHNESS} may be specified, but not both.  Also, if a {\ct WIND} line is present, {\ct Z\_0} must be consistent between {\ct SURF} and {\ct WIND} lines.  The value of {\ct Z\_0} on {\ct SURF} will override the default value from {\ct WIND}.
+
+When the ABL wall model is used, this also changes the wall stress model (see FDS Tech Guide~\cite{FDS_Math_Guide}).  The local Obukhov length, $L$ (see Sec.~\ref{info:WIND}), and viscous wall units, $y^+$ (see Sec.~\ref{info:yplus}), can be output using boundary files or wall devices.
 
 \subsubsection{Free Convection, Horizontal Cylinder}
 
@@ -4221,7 +4228,7 @@ where:
 \item[{\ct FAN\_ID}] is the {\ct ID} of a fan located in the duct. Instead of specifying a {\ct FAN\_ID}, you could specify the {\ct VOLUME\_FLOW} rate (m$^3$/s) through the duct. The operation of the fan can be controlled by either a device or a control function.
 \item[{\ct LENGTH}] is the {\ct LENGTH} of the duct in m.  Note that {\ct LENGTH} is not computed automatically as the difference between the {\ct XYZ} of the duct's endpoints.
 \item[{\ct LOSS}] is a pair of real numbers giving the forward and reverse dimensionless "minor losses" loss coefficient (\(K_{\mbox{\tiny minor}}\)) in the duct. Minor losses are pressure losses through components such as tees, valves and bends. However, you can use {\ct LOSS} to represent wall friction losses if you want - in this case ensure you leave {\ct ROUGHNESS} unset so that the HVAC solver does not compute a friction factor. The forward direction is defined as flow from the first node listed in {\ct NODE\_ID} to the second node listed in {\ct NODE\_ID}.
-\item[{\ct MASS\_FLOW}] is a fixed mass flow rate (kg/s) through the duct.  Only specify one of {\ct MASS\_FLOW} or {\ct VOLUME\_FLOW}.  You can change its value in time either using the characteristic time, {\ct TAU\_VF},  to define a tanh ({\ct TAU\_VF}>0) or t$^2$ ramp ({\ct TAU\_VF}<0); or you can specify a {\ct RAMP\_ID}.  {\ct MASS\_FLOW} should only be specified for conditions where the upstream node density will not change during the solution process.
+\item[{\ct MASS\_FLOW}] is a fixed mass flow rate (kg/s) through the duct. Do not specify both {\ct MASS\_FLOW} and {\ct VOLUME\_FLOW} for the same duct.  You can change its value in time either using the characteristic time, {\ct TAU\_VF},  to define a tanh ({\ct TAU\_VF}>0) or t$^2$ ramp ({\ct TAU\_VF}<0); or you can specify a {\ct RAMP\_ID}.  {\ct MASS\_FLOW} should only be specified for conditions where the upstream node density will not change during the solution process.
 \item[{\ct N\_CELLS}] Used when {\ct HVAC\_MASS\_TRANSPORT=.TRUE.}. It defines the number of cells used in a discretized duct.
 \item[{\ct NODE\_ID}] gives the {\ct ID}s of the nodes on either end of the duct segment.  Positive velocity in a duct is defined as flow from the first node to second node.
 \item[{\ct PERIMETER}] is used along with {\ct AREA} to specify a duct with non-circular cross-section.  The {\ct DIAMETER} will be computed as the hydraulic diameter.
@@ -6290,6 +6297,8 @@ By specifying a {\ct SPEC\_ID}, you are implicitly invoking the droplet evaporat
 
 The properties you need to supply for a liquid droplet depend on whether or not the {\ct SPEC\_ID} is listed in Table~\ref{tab:gasspecies}, and if the column labelled ``Liquid'' is checked with a ``Y'', meaning that its liquid properties are known. The following sub-sections provide instructions on what to do in various instances. Note that the {\ct INITIAL\_TEMPERATURE} ($^\circ$C) of the liquid droplets is specified on the {\ct PART} line. Its default value is the overall ambient temperature of the simulation, {\ct TMPA}, from the {\ct MISC} line.
 
+Heat transfer and evaporation from liquid droplets to the gas uses correlations for the heat and mass transfer coefficients. These can instead be respectively specified using {\ct HEAT\_TRANSFER\_COEFFICIENT\_GAS} and {\ct MASS\_TRANSFER\_COEFFICIENT} on the {\ct PART} line.
+
 \subsubsection{Known Liquid/Gas Species}
 
 If the {\ct SPEC\_ID} is listed in Table~\ref{tab:gasspecies}, and if the column labelled ``Liquid'' is checked with a ``Y'', you need only list the following:
@@ -6548,6 +6557,12 @@ Figure~\ref{hot_rods_image} displays the distribution of radii and the mass of r
 \caption[Results of the {\ct hot\_rods} test case]{(Left) Distribution of rod diameters. (Right) Total mass of rods as a function of time.}
 \label{hot_rods_image}
 \end{figure}
+
+
+\subsection{Solid Particle Movement on Solid Surfaces}
+\label{info:surface_solid_particles}
+
+By default, solid particles do not ``stick'' or adhere to solid surfaces like liquid droplets do. However, you can make solid particles act like liquid droplets by setting {\ct ADHERE\_TO\_SOLID=T} on the {\ct PART} line, in which case the particles will stick and be reassigned a new speed and direction. If the surface is horizontal, the direction is randomly chosen. If vertical, the direction is downwards. The parameters {\ct HORIZONTAL\_VELOCITY} and {\ct VERTICAL\_VELOCITY} on the {\ct PART} line allow you to control the speed at which particles move horizontally or vertically (downward). The defaults are 0.2~m/s and 0.5~m/s, respectively. If you want the particle to truly stick and not move on a surface, set these values to 0.
 
 
 \subsection{Splitting Particles}
@@ -6872,11 +6887,11 @@ Modeling fire suppression by water has three principal components: transporting 
 \label{info:surface_droplets}
 \label{cascade}
 
-When a droplet strikes a solid surface\footnote{If you do not want droplets to accumulate on solid surfaces, set {\ct ALLOW\_SURFACE\_PARTICLES=.FALSE.} on the {\ct MISC} line. It is normally {\ct .TRUE.}}, it sticks and is reassigned a new speed and direction. If the surface is horizontal, the direction is randomly chosen. If vertical, the direction is downwards. The parameters {\ct HORIZONTAL\_VELOCITY} and {\ct VERTICAL\_VELOCITY} on the {\ct PART} line allow you to control the speed at which droplets move horizontally or vertically (downward). The defaults are 0.2~m/s and 0.5~m/s, respectively.
+When a liquid\footnote{Solid particles do not stick to solid surfaces by default like liquid droplets. However, you can make solid particles act like liquid droplets by setting {\ct ADHERE\_TO\_SOLID=T} on the {\ct PART} line.} droplet strikes a solid surface\footnote{If you do not want droplets to accumulate on solid surfaces, set {\ct ALLOW\_SURFACE\_PARTICLES=.FALSE.} on the {\ct MISC} line. It is normally {\ct .TRUE.}}, it sticks and is reassigned a new speed and direction. If the surface is horizontal, the direction is randomly chosen. If vertical, the direction is downwards. The parameters {\ct HORIZONTAL\_VELOCITY} and {\ct VERTICAL\_VELOCITY} on the {\ct PART} line allow you to control the speed at which droplets move horizontally or vertically (downward). The defaults are 0.2~m/s and 0.5~m/s, respectively.
 
-When a liquid droplet hits a solid surface, it is assumed to form a film for the purpose of calculating heat transfer between the liquid and the solid surface. Thus, its diameter is not important because it is assumed to mix with other droplets forming the film. However, when the droplet leaves the solid surface in the form of a ``drip,'' it reforms into a droplet, but its new diameter is assumed to be 1000~$\mu$m unless you specify an alternative {\ct SURFACE\_DIAMETER} on the {\ct PART} line.
+When a liquid droplet hits a solid surface, it is assumed to form a thin film that is assumed to be no less than 0.00001~m thick. This value, {\ct MINIMUM\_FILM\_THICKNESS} (m), can be changed on the {\ct MISC} line. The diameter of the droplet, once it strikes a solid surface, is not important because it is assumed to mix with other droplets forming the film. However, when the droplet leaves the solid surface in the form of a ``drip,'' it reforms into a droplet, and its new diameter is assumed to be 1000~$\mu$m unless you specify an alternative {\ct SURFACE\_DIAMETER} on the {\ct PART} line in units of $\mu$m.
 
-The heat transfer coefficient from solid to liquid is constant, by default, and controlled by {\ct PART} property {H\_SOLID\_TO\_DROPLET}. To turn on an experimental model that calculates that dynamically, you should set {\ct CONSTANT\_H\_SOLID\_TO\_DROPLET=.FALSE.} on the {\ct MISC} line.
+The heat transfer coefficient between the solid and liquid is constant by default and specified by the {\ct PART} parameter {\ct HEAT\_TRANSFER\_COEFFICIENT\_SOLID}. Its default value is 300~W/(m$^2 \cdot$K). To turn on an experimental model that calculates this coefficient dynamically, just set its value to some negative number, say -1.
 
 There are some applications, like the suppression of racked storage commodity fires, where it is useful to allow water droplets to move horizontally along the underside of a solid object. It is difficult to model this phenomenon precisely because it involves surface tension, surface porosity and absorption, and complicated geometry. However, a way to capture some of the effect is to set {\ct ALLOW\_UNDERSIDE\_PARTICLES=.TRUE.} on the {\ct MISC} line. It is normally false. Also, note that when droplets hit obstructions, the vertical direction is assumed to coincide with the $z$ axis, regardless of any change to the gravity vector, {\ct GVEC}.
 
@@ -6931,15 +6946,15 @@ Most of the parameters that describe the atmosphere are entered on a single name
 
 \subsection{Basic Equations}
 
-The atmospheric boundary layer in FDS is modeled using Monin-Obukhov similarity theory. The wind speed profile, $u$, and potential temperature\footnote{The potential temperature is given by $$\theta=T \left( \frac{p_0}{p} \right)^{R/(W_{\rm air} \, c_p)}$$ where $p_0$ is typically 1000~mbar and $R/(W_{\rm air} \, c_p) \approx 0.286$.}, $\theta$, vary with height, $z$, according to:
+The atmospheric boundary layer in FDS is modeled using Monin-Obukhov similarity theory. The wind speed profile, $u$, and potential temperature\footnote{The potential temperature is given by $$\theta=T \left( \frac{p_0}{p} \right)^{R/(W_{\rm air} \, c_p)}$$ where $p_0$ is typically 100~kPa and $R/(W_{\rm air} \, c_p) \approx 0.286$.}, $\theta$, vary with height, $z$, according to:
 \begin{eqnarray}
-   u(z)      &=&            \frac{u_*}{\kappa}     \left[ \ln \left( \frac{z}{z_0} \right) - \psi_{\rm m} \left( \frac{z}{L} \right) \right] \label{u_om} \\[.15in]
-   \theta(z) &=& \theta_0 + \frac{\theta_*}{\kappa} \left[ \ln \left( \frac{z}{z_0} \right) - \psi_{\rm h} \left( \frac{z}{L} \right) \right]
+   u(z)      &=&            \frac{u_*}{\kappa}     \left[ \ln \left( \frac{z}{z_0} \right) - \Psi_{\rm m} \left( \frac{z}{L} \right) \right] \label{u_om} \\[.15in]
+   \theta(z) &=& \theta_0 + \frac{\theta_*}{\kappa} \left[ \ln \left( \frac{z}{z_0} \right) - \Psi_{\rm h} \left( \frac{z}{L} \right) \right]
 \end{eqnarray}
 where $u_*$ is the friction velocity, $\kappa=0.41$ is the Von K\'{a}rm\'{a}n constant, $z_0$ is the \emph{aerodynamic} roughness length, $\theta_*$ is the scaling potential temperature, $\theta_0$ is the ground level potential temperature, $L$ is the Obukhov length, and the similarity functions are those proposed by Dyer~\cite{Dyer:1974}:
 \begin{eqnarray}
-   \psi_{\rm m}\left(\frac{z}{L}\right) &=& \left\{ \begin{array}{c@{\quad:\quad}l} \displaystyle -5 \, \frac{z}{L} & L \ge 0 \\[.2in]  \displaystyle 2 \, \ln \left[\frac{1+\zeta}{2}\right] + \ln \left[\frac{1+\zeta^2}{2}\right]-2 \, \tan^{-1}(\zeta) + \frac{\pi}{2} & L<0 \end{array} \right.  \\[.2in]
-   \psi_{\rm h}\left(\frac{z}{L}\right) &=& \left\{ \begin{array}{c@{\quad:\quad}l} \displaystyle -5 \, \frac{z}{L} & L \ge 0 \\[.2in]  \displaystyle 2 \, \ln \left[\frac{1+\zeta^2}{2}\right] & L<0 \quad \quad  \displaystyle \zeta=\left( 1 - \frac{16 \, z}{L} \right)^{1/4}  \end{array} \right.
+   \Psi_{\rm M}\left(\frac{z}{L}\right) &=& \left\{ \begin{array}{c@{\quad:\quad}l} \displaystyle -5 \, \frac{z}{L} & L \ge 0 \\[.2in]  \displaystyle 2 \, \ln \left[\frac{1+\zeta}{2}\right] + \ln \left[\frac{1+\zeta^2}{2}\right]-2 \, \tan^{-1}(\zeta) + \frac{\pi}{2} & L<0 \end{array} \right.  \\[.2in]
+   \Psi_{\rm H}\left(\frac{z}{L}\right) &=& \left\{ \begin{array}{c@{\quad:\quad}l} \displaystyle -5 \, \frac{z}{L} & L \ge 0 \\[.2in]  \displaystyle 2 \, \ln \left[\frac{1+\zeta^2}{2}\right] & L<0 \quad \quad  \displaystyle \zeta=\left( 1 - \frac{16 \, z}{L} \right)^{1/4}  \end{array} \right.
 \end{eqnarray}
 The Obukhov length, $L$, characterizes the thermal stability of the atmosphere. When $L$ is negative, the atmosphere is unstably stratified; when positive, the atmosphere is stably stratified.  The stabilizing or destabilizing effects of stratification are strongest as $L$ nears zero.  Accordingly, a neutrally stratified atmosphere would have an infinite Obukhov length. Generally, an unstable atmosphere exhibits a decreasing temperature with height and relatively large fluctuations in wind direction/velocity. Unstable atmospheres are strongly affected by the buoyancy-generated turbulence, resulting in enhanced mixing.  Conversely, highly stable atmospheric conditions suppress turbulent mixing.
 
@@ -7077,9 +7092,10 @@ The \emph{aerodynamic} roughness length, $z_0$, is not the same as the \emph{san
 \ee
 For the purpose of implementing the Monin-Obukhov model within FDS, the velocity profile given by Eq.~(\ref{u_om}) near the ground where $\psi_{\rm m} \approx 0$ can be superimposed, leading to the effective translation of roughness factors:
 \be
-   s = z_0 \, {\rm e}^{8.5 \, \kappa} \approx 30 \, z_0
+\label{eq:roughness_conversion}
+   s = z_0 \, {\rm e}^{8.5 \, \kappa} \approx 32.6 \, z_0
 \ee
-To explicitly assert this relationship, you may set the {\ct ROUGHNESS} (m) on the {\ct SURF} line applied to the ground to be 30 times your chosen value of $z_0$.
+You may set either {\ct ROUGHNESS} or {\ct Z\_0} on the {\ct SURF} line (both in meters).  FDS will use Eq.~(\ref{eq:roughness_conversion}) to convert between the two depending on the wall model.
 
 \subsection{Sensible Heat Flux}
 
@@ -7157,7 +7173,7 @@ When the Rossby number is large, the Coriolis force is negligible.  In building 
 \begin{figure}
 \centering
 \includegraphics[scale=1.5]{FIGURES/Coriolis_vector}
-\caption{The rotation vector ${\bm\Omega}$ points from the Earth's center to the North Pole.  To apply the effect of rotation on our model, we need to know the components of the rotation vector in the reference frame of the computational domain.  Typically, we align the computational domain so that $x$ points east, $y$ points north, and $z$ represents elevation.  The angle $\phi$ [degrees] is the latitude, positive [$0^{\circ}$, $90^{\circ}$] in the northern hemisphere, negative [$0^{\circ}$, $-90^{\circ}$] in the southern hemisphere.  The rotation rate $\omega$ is (obviously) 1 rotation per day or $2\pi/(24 \times 3600) \approx 1.16 \times 10^{-5}$ $2\pi$/s.}
+\caption[Coriolis effect]{The rotation vector ${\bm\Omega}$ points from the Earth's center to the North Pole.  To apply the effect of rotation on our model, we need to know the components of the rotation vector in the reference frame of the computational domain.  Typically, we align the computational domain so that $x$ points east, $y$ points north, and $z$ represents elevation.  The angle $\phi$ [degrees] is the latitude, positive [$0^{\circ}$, $90^{\circ}$] in the northern hemisphere, negative [$0^{\circ}$, $-90^{\circ}$] in the southern hemisphere.  The rotation rate $\omega$ is (obviously) 1 rotation per day or $2\pi/(24 \times 3600) \approx 1.16 \times 10^{-5}$ $2\pi$/s.}
 \label{fig:rotation_vector}
 \end{figure}
 
@@ -7172,6 +7188,12 @@ U_g &= - \frac{1}{\rho f_c} \frac{\partial \bar{p}}{\partial y} \\
 V_g &= + \frac{1}{\rho f_c} \frac{\partial \bar{p}}{\partial x}
 \end{align}
 If the geostrophic wind speed is known, it can be entered on the {\ct WIND} line via {\ct GEOSTROPHIC\_WIND(1:2)} = $(U_g, V_g)$.  Notice that specification of the wind in $x$ implies a mean pressure gradient in $y$ and vice versa.  When a geostropic wind is specified, FDS converts this value to the implied {\ct FORCE\_VECTOR} according to Eq.~(\ref{eq:geostrophic_wind}).  To achieve the specified geostrophic wind aloft, you must also have the Coriolis force turned on (see Sec.~\ref{info:coriolis_force}).  Since the geostrophic wind is equivalent to applying {\ct FORCE\_VECTOR}, you may also apply a time ramp (see Sec.~\ref{info:force_vector}).
+
+
+\subsection{Deardorff Potential Temperature Correction}
+\label{info:potential_temperature_correction}
+
+The turbulent transport of heat in the atmosphere is greatly affected by the local stability condition.  In his 1980 paper \cite{Deardorff:1980}, Deardorff suggests a correction to the local turbulent viscosity to suppress turbulent transport in stable conditions.  To implement this correction in FDS, set {\ct POTENTIAL\_TEMPERATURE\_CORRECTION=T} on the {\ct WIND} line.  In this case, the local turbulent Prandtl number will be computed dynamically as discussed in \cite{Deardorff:1980}.  Details of the model are also discussed in the FDS Technical Guide \cite{FDS_Math_Guide}.
 
 
 \section{Wind Method 3: The ``Wall of Wind''}
@@ -7735,14 +7757,19 @@ This set of inputs invokes fuel model 5, but it also provides you with a way to 
 In this second option, you create your own custom fuel type as follows:
 \begin{lstlisting}
 &SURF ID = 'My Fuel'
-      VEG_LSET_ROS = 0.007
+      VEG_LSET_ROS_00 = 0.007
       VEG_LSET_SIGMA = 3344.
       VEG_LSET_BETA = 0.0041
       VEG_LSET_HT = 0.91
-      HRRPUA = 200.
-      BURN_DURATION = 20 /
+      VEG_LSET_SURF_LOAD = 0.5
+      VEG_LSET_CHAR_FRACTION = 0.25
+      VEG_LSET_FIREBASE_TIME = 20 /
 \end{lstlisting}
-{\ct VEG\_LSET\_ROS} is the no-wind, no-slope rate of spread for the given fuel model. {\ct VEG\_LSET\_SIGMA} (m$^{-1}$) and {\ct VEG\_LSET\_BETA} are the average surface to volume ratio ($\sigma$) and packing ratio ($\beta$) of the underlying vegetation. {\ct VEG\_LSET\_HT} (m) is the height of the vegetation. When the fire front arrives at a given surface cell, it begins to burn with a heat release per unit area given by {\ct HRRPUA} in kW/m$^2$ for a period of {\ct BURN\_DURATION}~s. The local burning rate and duration are function of the vegetation mass per unit area.
+{\ct VEG\_LSET\_ROS\_00} is the no-wind, no-slope rate of spread for the given fuel model. {\ct VEG\_LSET\_SIGMA} (m$^{-1}$) and {\ct VEG\_LSET\_BETA} are the average surface to volume ratio ($\sigma$) and packing ratio ($\beta$) of the underlying vegetation. {\ct VEG\_LSET\_HT} (m) is the height of the vegetation. When the fire front arrives at a given surface cell, fuel vapors are generated at a rate given by
+\be
+   \dot{m}_{\rm f}'' = (1-\nu_{\rm char}) \frac{m_{\rm f}''}{\delta t} \; {\rm kg}/({\rm m}^2 \cdot {\rm s})  \quad ; \quad \delta t = \frac{75600}{\sigma} \; \hbox{s}
+\ee
+Here, $m_{\rm f}''$ is the dry fuel loading in units of kg/m$^2$ ({\ct VEG\_LSET\_SURF\_LOAD}, default 0.3~kg/m$^2$); $\nu_{\rm char}$ is the char fraction ({\ct VEG\_LSET\_CHAR\_FRACTION}, default 0.2); and $\delta t$ is the duration of the fire at a given location. The expression for the burn duration is given by Albini~\cite{Albini:1976}, but you can enter your own burn duration using {\ct VEG\_LSET\_FIREBASE\_TIME} (s).
 
 
 
@@ -7783,7 +7810,7 @@ Bova et al.~\cite{Bova:IJWF2015} compare the level set calculation that has been
 \begin{lstlisting}
 &MISC ..., LEVEL_SET_MODE = 1 /
 &SURF ID = 'Custom Grass'
-      VEG_LSET_ROS = 0.04
+      VEG_LSET_ROS_00 = 0.04
       VEG_LSET_SIGMA = 11400.
       VEG_LSET_BETA = 0.0012
       VEG_LSET_HT = 0.51 /
@@ -10270,13 +10297,14 @@ be found in Volume~1 of the FDS Technical Reference Guide~\cite{FDS_Math_Guide}.
 {\ct GAS DENSITY}                               & Gas Density near wall                             & \si{kg/m^3}    & B,D          \\ \hline
 {\ct GAS TEMPERATURE}                           & Gas Temperature near wall                         & $^\circ$C      & B,D          \\ \hline
 {\ct H}                                         & $\cH=|\bu|^2/2 + \tp/\rho    $                    & (m/s)$^2$      & D,I,P,S      \\ \hline
-{\ct HEAT TRANSFER COEFFICIENT}                 & Convective heat transfer                          & \si{W/(m^2.K)} & B,D          \\ \hline
+{\ct HEAT TRANSFER COEFFICIENT}                 & Section \ref{info:convection}                     & \si{W/(m^2.K)} & B,D          \\ \hline
 {\ct HRRPUL}                                    & $\int \dq''' \, \d x \, \d y$                     & kW/m           & D            \\ \hline
 {\ct HRRPUV REAC}$^6$                           & $\dq'''$ for {\ct REAC\_ID}                       & kW/m$^3$       & D,S          \\ \hline
 {\ct IDEAL GAS PRESSURE}                        & $\bar{p}=\rho R T / \overline{W}$                 & Pa             & D,I,P,S      \\ \hline
 {\ct INTEGRATED INTENSITY}                      & $U=\int I \, \d \bs$                              & kW/m$^2$       & D,I,P,S      \\ \hline
 {\ct KINETIC ENERGY}                            & $(u^2+v^2+w^2)/2$                                 & (m/s)$^2$      & D,I,P,S      \\ \hline
 {\ct KOLMOGOROV LENGTH SCALE}                   & Section \ref{info:meshquality}                    & m              & D,I,P,S      \\ \hline
+{\ct OBUKHOV LENGTH}                            & Section \ref{sec:abl_model}                       & m              & B,D          \\ \hline
 {\ct MACH NUMBER}                               & $|\bu|/\sqrt{(R/\overline{W}) T \gamma}$          &                & S,D          \\ \hline
 {\ct MAXIMUM VELOCITY ERROR}                    & Section \ref{info:PRES}                           & m/s            & D            \\ \hline
 {\ct MIXING TIME}                               & Combustion mixing time                            & s              & D,I,P,S      \\ \hline
@@ -10309,17 +10337,18 @@ be found in Volume~1 of the FDS Technical Reference Guide~\cite{FDS_Math_Guide}.
 %{\ct TOTAL MASS FLUX X} & $\overline{\rho Y_\alpha} u + \rho D_\alpha \partial Y_\alpha/\partial x$ & kg/s/m$^2$     & D,I,P,S      \\ \hline
 %{\ct TOTAL MASS FLUX Y} & $\overline{\rho Y_\alpha} v + \rho D_\alpha \partial Y_\alpha/\partial y$ & kg/s/m$^2$     & D,I,P,S      \\ \hline
 %{\ct TOTAL MASS FLUX Z} & $\overline{\rho Y_\alpha} w + \rho D_\alpha \partial Y_\alpha/\partial z$ & kg/s/m$^2$     & D,I,P,S      \\ \hline
-{\ct U MEAN FORCING}                            & Section~\ref{info:SPONGE_CELLS}                   &  m/s           & D            \\ \hline
-{\ct V MEAN FORCING}                            & Section~\ref{info:SPONGE_CELLS}                   &  m/s           & D            \\ \hline
-{\ct W MEAN FORCING}                            & Section~\ref{info:SPONGE_CELLS}                   &  m/s           & D            \\ \hline
+{\ct TURBULENT PRANDTL NUMBER}$^7$              & $\nu_t/\alpha_t$                                  &                & D,I,P,S      \\ \hline
+{\ct U MEAN FORCING}                            & Section~\ref{info:SPONGE_CELLS}                   & m/s            & D            \\ \hline
+{\ct V MEAN FORCING}                            & Section~\ref{info:SPONGE_CELLS}                   & m/s            & D            \\ \hline
 {\ct VELOCITY ERROR}                            & Section~\ref{info:PRES}                           &                & B            \\ \hline
-{\ct VISCOUS STRESS WALL}                       & Section~\ref{info:distributed_forces}        &    Pa       &  B,D        \\ \hline
+{\ct VISCOUS STRESS WALL}                       & Section~\ref{info:distributed_forces}             & Pa             & B,D          \\ \hline
 {\ct VISCOUS WALL UNITS}                        & Section~\ref{info:yplus}                          &                & B,D          \\ \hline
 {\ct VN}                                        & Section~\ref{info:TIMING}                         &                & D,I,P,S      \\ \hline
 {\ct VN MAX}                                    & Section~\ref{info:TIMING}                         &                & D            \\ \hline
 {\ct VORTICITY X}                               & $\partial w/\partial y - \partial v/\partial z$   & 1/s            & D,I,P,S      \\ \hline
 {\ct VORTICITY Y}                               & $\partial u/\partial z - \partial w/\partial x$   & 1/s            & D,I,P,S      \\ \hline
 {\ct VORTICITY Z}                               & $\partial v/\partial x - \partial u/\partial y$   & 1/s            & D,I,P,S      \\ \hline
+{\ct W MEAN FORCING}                            & Section~\ref{info:SPONGE_CELLS}                   &  m/s           & D            \\ \hline
 %{\ct WALL CELL BOUNDARY TYPE}                   & Index of {\ct WC\%BOUNDARY\_TYPE} for debug       &                & B            \\ \hline
 %{\ct WALL CELL THERMAL BOUNDARY TYPE}           & Index of {\ct SF\%THERMAL\_BC\_INDEX} for debug   &                & B            \\ \hline
 {\ct WALL ENTHALPY}                             & $\int \rho_s c_s T \,\d V_s$                      & kJ             & B,D          \\ \hline
@@ -10335,7 +10364,8 @@ $^2$                 \> Requires the specification of a particle name using {\ct
 $^3$                 \> Requires specification of an additional scalar using {\ct QUANTITY2}. \\
 $^4$                 \> Allows for an optional {\ct MATL\_ID}. \\
 $^5$                 \> Allows for an optional {\ct REAC\_ID}.  Default is Reaction 1. \\
-$^6$                 \> Requires {\ct REAC\_ID}.
+$^6$                 \> Requires {\ct REAC\_ID}. \\
+$^7$                 \> Requires {\ct POTENTIAL\_TEMPERATURE\_CORRECTION=T} on {\ct WIND}.
 \end{tabbing}
 
 
@@ -10417,9 +10447,9 @@ properties be specified as well. Simply prescribing as many properties as possib
 % ignorenamelistkw: /PRES/SCARC_COARSE_ITERATIONS, /PRES/SCARC_COARSE_ACCURACY
 % ignorenamelistkw: /PROP/BEAD_DENSITY, /PROP/BEAD_DIAMETER, /PROP/BEAD_EMISSIVITY, /PROP/BEAD_HEAT_TRANSFER_COEFFICIENT, /PROP/BEAD_SPECIFIC_HEAT, /PROP/DROPLET_VELOCITY
 % ignorenamelistkw: /SLCF/RLE_MIN, /SLCF/RLE_MAX, /SLCF/SLICETYPE
-% ignorenamelistkw: /SURF/EXTERNAL_FLUX_RAMP, /SURF/TAU_EXTERNAL_FLUX, /SURF/VOLUME_FLUX
+% ignorenamelistkw: /SURF/EXTERNAL_FLUX_RAMP, /SURF/TAU_EXTERNAL_FLUX, /SURF/VOLUME_FLUX, /SURF/AERODYNAMIC_ROUGHNESS
 % ignorenamelistkw: /TIME/TWFIN
-% ignorenamelistkw: /WIND/MEAN_FORCING, /WIND/OBUKHOV_LENGTH, /WIND/REFERENCE_HEIGHT, /WIND/REFERENCE_TEMPERATURE
+% ignorenamelistkw: /WIND/OBUKHOV_LENGTH, /WIND/REFERENCE_HEIGHT, /WIND/REFERENCE_TEMPERATURE
 
 % ignore keywords that appear on any namelist
 % ignoreallkw: FYI
@@ -11157,7 +11187,6 @@ $\Delta t$={\ct T\_END-T\_BEGIN}
 {\ct CHECK\_HT}                                     & Logical      & Section~\ref{info:HT}                   &            & {\ct .FALSE.}     \\ \hline
 {\ct CHECK\_VN}                                     & Logical      & Section~\ref{info:VN}                   &            & {\ct .TRUE.}      \\ \hline
 {\ct CNF\_CUTOFF}                                   & Real         & Section~\ref{info:particle_size}        &            & 0.005             \\ \hline
-{\ct CONSTANT\_H\_SOLID\_TO\_DROPLET}               & Real         & Section~\ref{info:surface_droplets}     &            & .TRUE.            \\ \hline
 {\ct \footnotesize CONSTANT\_SPECIFIC\_HEAT\_RATIO} & Logical      & Section~\ref{info:Enthalpy}             &            & {\ct .FALSE.}     \\ \hline
 {\ct C\_RNG}                                        & Real         & Section~\ref{info:LES}                  &            & 0.20              \\ \hline
 {\ct C\_RNG\_CUTOFF}                                & Real         & Section~\ref{info:LES}                  &            & 10.               \\ \hline
@@ -11186,6 +11215,7 @@ $\Delta t$={\ct T\_END-T\_BEGIN}
 {\ct LEVEL\_SET\_MODE}                              & Integer      & Section~\ref{info:level_set}            &            & 0                 \\ \hline
 {\ct MAXIMUM\_VISIBILITY}                           & Real         & Section~\ref{info:visibility}           &  m         &  30               \\ \hline
 {\ct MAX\_LEAK\_PATHS}                              & Integer      & Section~\ref{info:Leaks}                &            &  200              \\ \hline
+{\ct MINIMUM\_FILM\_THICKNESS}                      & Real         & Section~\ref{info:surface_droplets}     &  m         & 0.00001           \\ \hline
 {\ct MPI\_TIMEOUT}                                  & Real         & Section~\ref{info:TIMING}               &  s         & 10.               \\ \hline
 {\ct NEAR\_WALL\_TURBULENCE\_MODEL}                 & Character    & Section~\ref{info:LES}                  &            &                   \\ \hline
 {\ct NOISE}                                         & Logical      & Section~\ref{info:NOISE}                &            & {\ct .TRUE.}      \\ \hline
@@ -11200,7 +11230,6 @@ $\Delta t$={\ct T\_END-T\_BEGIN}
 {\ct PARTICLE\_CFL\_MIN}                            & Real         & Section~\ref{info:PART_Stability}       &            & 0.8               \\ \hline
 {\ct POROUS\_FLOOR}                                 & Logical      & Section~\ref{info:sprinklers}           &            & {\ct .TRUE.}      \\ \hline
 {\ct PR}                                            & Real         & Section~\ref{info:LES}                  &            & 0.5               \\ \hline
-{\ct PROJECTION}                                    & Logical      & Section~\ref{info:CSVF}                 &            & {\ct .FALSE.}     \\ \hline
 {\ct P\_INF}                                        & Real         & Section~\ref{info:MISC_Basics}          & Pa         & 101325            \\ \hline
 {\ct RAMP\_GX}                                      & Character    & Section~\ref{info:GVEC}                 &            &                   \\ \hline
 {\ct RAMP\_GY}                                      & Character    & Section~\ref{info:GVEC}                 &            &                   \\ \hline
@@ -11235,7 +11264,7 @@ $\Delta t$={\ct T\_END-T\_BEGIN}
 % DO_IMPLICIT_CCREGION (MV), ENTHALPY_TRANSPORT (RJM),
 % EVAP_MODEL, EXTERNAL_BOUNDARY_CORRECTION, HT3D_TEST (RJM), MAXIMUM_GEOMETRY_FACES(MV), MAXIMUM_GEOMETRY_ZVALS(MV), NUCLEATION_SITES, PERIODIC_TEST (RJM),
 % POSITIVE_ERROR_TEST, PROFILING, QFAN_BETA_TEST, TENSOR_DIFFUSIVITY (RJM), TURB_INIT_CLOCK (RJM),
-% UVW_FILE (RJM), STORE_DIVERGENCE_CORRECTION (RJM)
+% UVW_FILE (RJM), STORE_DIVERGENCE_CORRECTION (RJM), PROJECTION (RJM)
 
 \vspace{\baselineskip}
 
@@ -11392,6 +11421,7 @@ $\Delta t$={\ct T\_END-T\_BEGIN}
 \multicolumn{5}{|c|}{{\ct PART} (Lagrangian Particles/Droplets)} \\
 \hline \hline
 \endhead
+{\ct ADHERE\_TO\_SOLID}                  & Logical     & Section~\ref{info:surface_solid_particles}                            &                   & {\ct .FALSE.}         \\ \hline
 {\ct AGE}                                & Real        & Section~\ref{info:part_output}                                        & s                 & $1\times 10^5$        \\ \hline
 {\ct BREAKUP}                            & Logical     & Section~\ref{info:secondary_breakup}                                  &                   & {\ct .FALSE.}         \\ \hline
 {\ct BREAKUP\_CNF\_RAMP\_ID}             & Character   & Section~\ref{info:secondary_breakup}                                  &                   &                       \\ \hline
@@ -11413,13 +11443,15 @@ $\Delta t$={\ct T\_END-T\_BEGIN}
 {\ct FREE\_AREA\_FRACTION}               & Real        & Section~\ref{info:particle_screen}                                    &                   &                       \\ \hline
 {\ct GAMMA\_D}                           & Real        & Section~\ref{info:particle_size}                                      &                   & 2.4                   \\ \hline
 {\ct HEAT\_OF\_COMBUSTION}               & Real        & Section~\ref{info:fuel_droplets}                                      & kJ/kg             &                       \\ \hline
+{\ct HEAT\_TRANSFER\_COEFFICIENT\_GAS}   & Real        & Section~\ref{thermal_part_props}                                      & W/m$^2$/K         &                      \\ \hline
+{\ct HEAT\_TRANSFER\_COEFFICIENT\_SOLID} & Real        & Section~\ref{info:surface_droplets}                                   & W/m$^2$/K         & 300                  \\ \hline
 {\ct HORIZONTAL\_VELOCITY}               & Real        & Section~\ref{info:surface_droplets}                                   & m/s               &  0.2                  \\ \hline
-{\ct H\_SOLID\_TO\_DROPLET}              & Real        & Section~\ref{info:surface_droplets}                                   & \si{kJ/(m$^2$.K)} &  0.3                  \\ \hline
 {\ct ID}                                 & Character   & Section~\ref{info:PART_Basics}                                        &                   &                       \\ \hline
-{\ct INITIAL\_TEMPERATURE}               & Real        & Section~\ref{thermal_part_props}                                      & $^\circ$C          & {\ct TMPA}            \\ \hline
+{\ct INITIAL\_TEMPERATURE}               & Real        & Section~\ref{thermal_part_props}                                      & $^\circ$C         & {\ct TMPA}            \\ \hline
 {\ct KILL\_DIAMETER}                     & Real        & Section~\ref{info:particle_size}                                      & $\mu$m            &                       \\ \hline
 {\ct MASSLESS}                           & Logical     & Section~\ref{info:MASSLESS}                                           &                   & {\ct .FALSE.}         \\ \hline
-{\ct MAXIMUM\_DIAMETER}                  & Real        & Section~\ref{info:particle_size}                                      & $\mu$m            & Infinite              \\ \hline
+{\ct MASS\_TRANSFER\_COEFFICIENT}        & Real        & Section~\ref{thermal_part_props}                                      & m/s               &                      \\ \hline
+{\ct MAXIMUM\_DIAMETER}                  & Real        & Section~\ref{info:particle_size}                                      & $\mu$m            & 1000000               \\ \hline
 {\ct MINIMUM\_DIAMETER}                  & Real        & Section~\ref{info:particle_size}                                      & $\mu$m            &                       \\ \hline
 {\ct MONODISPERSE}                       & Logical     & Section~\ref{info:particle_size}                                      &                   & {\ct .FALSE.}         \\ \hline
 {\ct N\_STRATA}                          & Integer     & Section~\ref{info:particle_size}                                      &                   & 6                     \\ \hline
@@ -11753,6 +11785,7 @@ $\Delta t$={\ct T\_END-T\_BEGIN}
 {\ct MAXIMUM\_VALUE}    & Real              & Reference~\cite{Smokeview_Users_Guide}    &           &                   \\ \hline
 {\ct MESH\_NUMBER}      & Integer           & Section~\ref{info:SLCF}                   &           &                   \\ \hline
 {\ct MINIMUM\_VALUE}    & Real              & Reference~\cite{Smokeview_Users_Guide}    &           &                   \\ \hline
+%{\ct MULTI\_RES}        & Logical           & Reference~\cite{info:SLCF}                &           &                   \\ \hline
 {\ct PART\_ID}          & Character         & Section~\ref{info:outputquantities}       &           &                   \\ \hline
 {\ct PBX, PBY, PBZ}     & Real              & Section~\ref{info:SLCF}                   & m         &                   \\ \hline
 {\ct PROP\_ID}          & Character         & Section~\ref{info:FED}                    &           &                   \\ \hline
@@ -11955,6 +11988,8 @@ $\Delta t$={\ct T\_END-T\_BEGIN}
 {\ct TMP\_INNER(:)}                                       & Real Array      & Section~\ref{info:TMP_INNER}              & $^\circ$C           & 20.                     \\ \hline
 {\ct TRANSPARENCY}                                        & Real            & Section~\ref{info:colors}                 &                     & 1.                      \\ \hline
 {\ct VEG\_LSET\_BETA}                                     & Real            & Section~\ref{info:level_set}              &                     & 0.                      \\ \hline
+{\ct VEG\_LSET\_CHAR\_FRACTION}                           & Real            & Section~\ref{info:level_set}              &                     & 0.2                     \\ \hline
+{\ct VEG\_LSET\_FIREBASE\_TIME}                           & Real            & Section~\ref{info:level_set}              & s                   &                         \\ \hline
 {\ct VEG\_LSET\_FUEL\_INDEX}                              & Integer         & Section~\ref{info:level_set}              &                     &                         \\ \hline
 {\ct VEG\_LSET\_HT}                                       & Real            & Section~\ref{info:level_set}              &                     & 0.                      \\ \hline
 {\ct VEG\_LSET\_IGNITE\_TIME}                             & Real            & Section~\ref{info:level_set}              & s                   &                         \\ \hline
@@ -11964,11 +11999,12 @@ $\Delta t$={\ct T\_END-T\_BEGIN}
 {\ct VEG\_LSET\_MLW}                                      & Real            & Section~\ref{info:level_set}              &                     & 0.70                    \\ \hline
 {\ct VEG\_LSET\_MLH}                                      & Real            & Section~\ref{info:level_set}              &                     & 0.70                    \\ \hline
 {\ct VEG\_LSET\_QCON}                                     & Real            & Section~\ref{info:level_set}              & kW/m$^2$            & 0.                      \\ \hline
-{\ct VEG\_LSET\_ROS}                                      & Real            & Section~\ref{info:level_set}              & m/s                 & 0.                      \\ \hline
+{\ct VEG\_LSET\_ROS\_00}                                  & Real            & Section~\ref{info:level_set}              & m/s                 & 0.                      \\ \hline
 {\ct VEG\_LSET\_ROS\_BACK}                                & Real            & Section~\ref{info:level_set}              & m/s                 & 0.                      \\ \hline
 {\ct VEG\_LSET\_ROS\_FLANK}                               & Real            & Section~\ref{info:level_set}              & m/s                 & 0.                      \\ \hline
 {\ct VEG\_LSET\_ROS\_HEAD}                                & Real            & Section~\ref{info:level_set}              & m/s                 & 0.                      \\ \hline
-{\ct VEG\_LSET\_SIGMA}                                    & Real            & Section~\ref{info:level_set}              &                     & 0.                      \\ \hline
+{\ct VEG\_LSET\_SIGMA}                                    & Real            & Section~\ref{info:level_set}              & 1/m                 & 0.                      \\ \hline
+{\ct VEG\_LSET\_SURF\_LOAD}                               & Real            & Section~\ref{info:level_set}              & kg/m$^2$            & 0.3                     \\ \hline
 {\ct VEG\_LSET\_TAN2}                                     & Real            & Section~\ref{info:level_set}              &                     &                         \\ \hline
 {\ct VEG\_LSET\_WIND\_EXP}                                & Real            & Section~\ref{info:level_set}              &                     & 1.                      \\ \hline
 {\ct VEL    }                                             & Real            & Section~\ref{info:Velocity_BC}            & m/s                 &                         \\ \hline
@@ -11979,6 +12015,7 @@ $\Delta t$={\ct T\_END-T\_BEGIN}
 {\ct WIDTH}                                               & Real            & Section~\ref{info:PART_GEOMETRY}          & m                   &                         \\ \hline
 {\ct XYZ(3)}                                              & Real Array      & Section~\ref{info:spread}                 & m                   &                         \\ \hline
 {\ct Z0 }                                                 & Real            & Section~\ref{info:stratification}         & m                   & 10.                     \\ \hline
+{\ct Z\_0 }                                               & Real            & Section~\ref{sec:abl_model}               & m                   & 0.                      \\ \hline
 \end{longtable}
 
 % Undocumented: FSK_A, FSK_K, FSK_W, IMPERMEABLE
@@ -12145,6 +12182,8 @@ $\Delta t$={\ct T\_END-T\_BEGIN}
 {\ct L}                                         & Real          & Section~\ref{info:WIND}                       & m             & 0                 \\ \hline
 {\ct LAPSE\_RATE}                               & Real          & Section~\ref{info:stratification}             & $^\circ$C/m   & 0                 \\ \hline
 {\ct LATITUDE}                                  & Real          & Section~\ref{info:coriolis_force}             & degrees       &                   \\ \hline
+{\ct MEAN\_FORCING(3)}                          & Logical       & Section~\ref{info:SPONGE_CELLS}               &               & {\ct .FALSE.}     \\ \hline
+{\ct POTENTIAL\_TEMPERATURE\_CORRECTION}        & Logical       & Section~\ref{info:potential_temperature_correction} &         & {\ct .FALSE.}     \\ \hline
 {\ct RAMP\_DIRECTION}                           & Character     & Section~\ref{info:WIND}                       &               &                   \\ \hline
 {\ct RAMP\_FVX\_T}                              & Character     & Section~\ref{info:force_vector}               &               &                   \\ \hline
 {\ct RAMP\_FVY\_T}                              & Character     & Section~\ref{info:force_vector}               &               &                   \\ \hline
@@ -12168,7 +12207,7 @@ $\Delta t$={\ct T\_END-T\_BEGIN}
 {\ct Z\_REF}                                    & Real          & Section~\ref{info:WIND}                       & m             & 2.                \\ \hline
 \end{longtable}
 
-% Undocumented: POTENTIAL_TEMPERATURE_CORRECTION (RJM), USE_ATMOSPHERIC_INTERPOLATION (RJM)
+% Undocumented: USE_ATMOSPHERIC_INTERPOLATION (RJM)
 
 \vspace{\baselineskip}
 
